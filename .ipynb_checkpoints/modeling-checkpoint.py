@@ -119,7 +119,3 @@ mu = y_train.std()
 print(y_train_bar), print(mu)
 y_df['standardize'] = y_df['chance_of_addmission'].apply(lambda x : (x-y_train_bar)/mu)
 sns.distplot(y_df['standardize'])
-
-
-"""This one create a new dataframe"""
-def new_df(df, features)
