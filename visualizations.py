@@ -20,17 +20,23 @@ plt.rcParams.update(params)
 plt.style.use('seaborn-whitegrid')
 sns.set_style("white")
 
-def get_scatter_GRE_TOEFL_GCPA(df,features=['GRE_Score','TOEFL_Score','CGPA']):
+def get_scatter_GRE_TOEFL_GCPA(df,features=['GRE_Score','TOEFL_Score','CGPA'], savefig=True,save_path='img/scatter_GRE_TOEFL_GCPA'):
+    
     """
     plot a scatter plot of GRE against TEOFL with GCPA as color
     """
-    sns.set_context("poster")
+
     length = 15
     height = length *2/3
     dots = length * 2
-    plt.figure(figsize=(length,height))
+    fig = plt.figure(figsize=(length,height))
+    sns.set_context("poster")
     sns.scatterplot(df[features[0]], df[features[1]],df[features[2]], palette='viridis', sizes=(dots,dots))
+    if savefig:
+        plt.savefig(save_path)
     plt.show()
+    return fig
+    
 
 def overlapping_density(package=None, input_vars=None, target_vars=None):
     """
