@@ -13,6 +13,7 @@ import statsmodels.formula.api as smf
 from sklearn.linear_model import LinearRegression
 from sklearn.linear_model import Lasso
 from sklearn.linear_model import Ridge
+import itertools
 
 from sklearn.model_selection import cross_val_score, train_test_split
 
@@ -27,26 +28,56 @@ def adjusted_r_suared(r_squared, num_samples, num_regressors):
     return 1 - ((1-r_squared)*(num_samples - 1) / (num_samples - num_regressors - 1))
 
 
-""" This code is imported from regularization class"""
-def model_expreriment(num_iter = 5, models = ['ols', 'ridge', 'lasso'], complexity = 'simple'):
-    
-    x_axis = np.arange(num_iter)
-#     y_ols_test = []
-    y_ols_train = []
-#     y_lasso_test = []
-    y_lasso_train = []
-#     y_ridge_test = []
-    y_ridge_train = []
-    sample_models = {}
-    for i in range(num_iter):
-        
-        if complexity == 'simple':
-            ## split train_test 
-            X_train, X_test, y_train, y_test = train_test_split(X, y, test_size = 0.2)
-        elif complexity == 'polynomial':
-            ## test-train split
-            X_train, X_test, y_train, y_test = train_test_split(Xp, y, test_size = 0.2)
+def lasso_test_scores(X_list,y):
+    degrees = [1,2,3]
+    alphas = [0.0001,0.01,0.1,0.5,1,2,5,10,30,100] 
+    results = []
 
+    #create 
+    for degree, alpha in itertools.product(degrees, alphas):
+        y_lasso_test_mean = model_expreriment(
+            X_list[degree-1],
+            y,
+            num_iter = 5,
+            alpha = alpha,
+            max_iter= 1000,
+            show_plot = False
+        )
+        results.append([degree, alpha, y_lasso_test_mean])
+
+    r2_test = pd.DataFrame(results, columns=['degrees', 'alpha', 'r2'])
+    return r2_test
+
+def get_lasso_model_list(X_list,y,alpha=1,max_iter=10000):
+    """
+    Generate a list of lasso models corresponding to a list of X dataframes
+    """
+    lasso_model_list = [
+        r.get_lasso(X[i],y,alpha=0.00001,max_iter=10000).score(X[i],y)
+        for i
+        in range(0,len(X))
+    ]
+    return lasso_model_list
+
+
+def get_lasso_model_score(X_list,y,alpha=1,max_iter=10000):
+    """
+    Generate a list of lasso models corresponding to a list of X dataframes
+    """
+    lasso_model_list = [
+        r.get_lasso(X[i],y,alpha=0.00001,max_iter=10000).score(X[i],y)
+        for i
+        in range(0,len(X))
+    ]
+    return lasso_model_list
+
+def model_expreriment(X,y,num_iter = 5,alpha = 1, max_iter= 1000,show_plot = False):
+    """
+    get the mean lasso.score(X_test,y_test) for any 
+    """
+    y_lasso_test = []
+    for i in range(num_iter):
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size = 0.2)
 
         ## Standard scale mean = 0, variance = 1
         sd = StandardScaler()
@@ -55,71 +86,19 @@ def model_expreriment(num_iter = 5, models = ['ols', 'ridge', 'lasso'], complexi
 
         X_train = sd.transform(X_train)
 
-#         X_test = sd.transform(X_test)
+        X_test = sd.transform(X_test)
 
-        ## Be careful about the leakage
-
-        ## Vanilla model
-        if 'ols' in models:
-            lr = LinearRegression()
-
-            lr.fit(X_train, y_train)
-            
-            sample_models['ols'] = lr
-
-#             test_score = lr.score(X_test, y_test)
-            train_score = lr.score(X_train, y_train)
-
-            y_ols_train.append(train_score)
-
-#           print('test score OLS is %.2f and train score is %.2f'%(test_score, train_score))
-            print('train score is %.2f'%(train_score))
-
-        if 'ridge' in models:
-            ## Ridge in the simple setting
-            ridge = Ridge(alpha = 10, max_iter= 10000)
-            ridge.fit(X_train, y_train)
-            sample_models['ridge'] = ridge
-            y_ridge_train.append(ridge.score(X_train, y_train))
-    #         print('test score Ridge is %.2f and train score is %.2f'%(ridge.score(X_test, y_test),
-    #                                                             ridge.score(X_train, y_train)))
-            print('train score is %.2f'%(ridge.score(X_train, y_train)))
-
-        if 'lasso' in models:
-            ## Lasso in the simple setting
-            lasso = Lasso(alpha = 10, max_iter= 10000)
-
-            lasso.fit(X_train, y_train)
-            
-            sample_models['lasso'] = lasso
-            
-            y_lasso_train.append(lasso.score(X_train, y_train))
-    #         print('test score Lasso is %.2f and train score is %.2f'%(lasso.score(X_test, y_test),
-    #                                                             lasso.score(X_train, y_train)))
-            print('train score is %.2f'%(lasso.score(X_train, y_train)))
+        lasso = Lasso(alpha = alpha, max_iter= max_iter)
+        lasso.fit(X_train, y_train)
+                        
+        y_lasso_test.append(lasso.score(X_test, y_test))
 
         i+=1
-    if 'ols' in models:
-        plt.plot(y_ols_train, label = 'ols')
-    if 'ridge' in models:
-        plt.plot(y_ridge_train, label = 'ridge')
-    if 'lasso' in models:
-        plt.plot(y_lasso_train, label = 'lasso')
-    plt.ylim([0,1])
-    plt.ylabel('R2 test score')
-    plt.xlabel('number of iterations')
-    plt.legend()
-    return sample_models, y_ols_train, y_ridge_train, y_lasso_train
 
-
-
-
-y_train_bar = y_train.mean()
-mu = y_train.std()
-print(y_train_bar), print(mu)
-y_df['standardize'] = y_df['chance_of_addmission'].apply(lambda x : (x-y_train_bar)/mu)
-sns.distplot(y_df['standardize'])
-
-
-"""This one create a new dataframe"""
-def new_df(df, features)
+    if show_plot:
+        plt.plot(y_lasso_test, label = 'lasso')
+        plt.ylim([0,1])
+        plt.ylabel('R2 test score')
+        plt.xlabel('number of iterations')
+        plt.legend()
+    return (sum(y_lasso_test)/len(y_lasso_test))

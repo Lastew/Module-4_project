@@ -81,8 +81,12 @@ def help_tools(library_name = "rs."):
     regression_tools = [
     "train_test_split_fxn(X, y, random_state = 12345, test_size = .25):",  #update with parameters
     "pair_plot(df):",
+    "log_transform(df_input,features):",
     "create_log(df,features):",
-    "statsmodel_ols_formula_regression(X,y,target_name=False,features_list=False,suppress=False,show_resid=False,qqplot_line='s'): #preferred over sm"
+    "create_higher_order(X_initial,degree=1,verbose=True):",
+    "get_higher_order_list(X,degrees=1,verbose=False):",
+    "get_lasso(X,y,alpha=1,**kwargs):",
+    "statsmodel_ols_formula_regression(X,y,target_name=False,features_list=False,suppress=False,show_resid=False,qqplot_line='s',print_resid=False,resid_path=False): #preferred over sm"
     ]
 
     timeseries_tools = [
@@ -192,12 +196,138 @@ def pair_plot(df):
     sns.pairplot(df)
     plt.show()
 
-def create_log(df,features):
-    df_new = df
+
+
+
+# log transform the x columns
+def log_transform(df_input,features):
+    """
+    converts specificed columns of df to log and saves with suffix '_log'
+    columns are specified by inputing a list features with columns names
+    """
+    df = df_input.copy()
+    df = df.loc[:,features].applymap(np.log).add_suffix('_log')
     # add functions to turn the feature or feature list into log of features
     # save each new feature as feature_log
-    print("pending completion")
-    return df_new
+#     print("pending completion")
+    return df
+
+def inverse_transform(y,features_list):
+    """
+    converts specificed columns of df to an inverse and saves
+    with suffix '_inv_transform' the target column are specified by inputing
+    a list features with columns names
+    """
+    y = y.loc[:,features_list].apply(lambda x : 1/x).add_suffix(
+    '_inv_transform')
+    return y
+
+def get_residual_plot(X_col,y,rows=1,cols=1,position=1,ax=False,title=False):
+    plt.subplot(rows,cols,position)
+    sns.residplot(X_col,y)
+    if title:
+        ax = plt.xlabel(title)
+
+def residual_plot(X,y,feature_list=False,cols=1,savefig=False,save_path=False,title="Distribution Plot",**kwargs):
+    """
+    residual plot for multiple features
+    parameters: **kwargs passed to sns.plt.subplots()
+    savefig allows to save residual plot
+    save_path must be identified
+    title: set to False to remove
+    """
+
+    if not feature_list:
+        feature_list = list(X.columns)
+
+    # residual plot for all three features
+
+    num_plots = len(feature_list)
+    rows = num_plots // cols
+    f, axs = plt.subplots(rows,cols,figsize=(10,10),**kwargs)
+
+    y1 = y.copy()
+
+    for i,feature in enumerate(feature_list):
+        get_residual_plot(X[feature],y1,rows=rows,cols=cols,position=i+1,ax=axs[i],title=feature)
+
+        # need to include something like the below to allow for multiple cols
+#         row_position = (i+1) % cols
+#         col_position = ((i) // cols)+1
+#         get_residual_plot(X[feature],y1,rows=rows,cols=cols,position=i+1,ax=axs[row_position,col_position],title=feature)
+
+    if title:
+        f.suptitle(title, fontsize=16)
+    if savefig:
+        if save_path:
+            plt.savefig(save_path)
+        else:
+            print("please specify path to save image")
+    plt.show()
+
+# from sklearn.linear_model import LinearRegression
+from sklearn.preprocessing import PolynomialFeatures
+def create_higher_order(X_initial,degree=1,verbose=True):
+    """
+    Create one new df with polynomial terms up to the requested degree
+    """
+    X = X_initial.copy()
+    poly = PolynomialFeatures(degree=degree)
+    Xp = poly.fit_transform(X)
+
+    if verbose:
+        print('Shape before adding higher order terms:', X.shape)
+        print('Shape after adding higher order terms: ', Xp.shape)
+
+    return Xp
+
+def get_higher_order_list(X,degrees=1,verbose=False):
+    """
+    gives a list of new dataframes with higher order degrees
+    up to the specified degreefor example, selecting degrees = 3 will
+    give a df with degree =1, another with degee=2 and another with degree=3
+    uses create_higher_order function
+    """
+
+    list_of_dfs = [
+        create_higher_order(X,degree=i,verbose=verbose)
+        for i
+        in range(1,degrees+1)
+    ]
+    return list_of_dfs
+
+def get_lasso_model_list(X_list,y,alpha=1,max_iter=10000):
+    """
+    Generate a list of lasso models corresponding to a list of X dataframes
+    """
+    lasso_model_list = [
+        r.get_lasso(X[i],y,alpha=0.00001,max_iter=10000).score(X[i],y)
+        for i
+        in range(0,len(X))
+    ]
+    return lasso_model_list
+
+def get_lasso_model_score(X_list,y,alpha=1,max_iter=10000):
+    """
+    Generate a list of lasso models corresponding to a list of X dataframes
+    """
+    lasso_model_list = [
+        r.get_lasso(X[i],y,alpha=0.00001,max_iter=10000).score(X[i],y)
+        for i
+        in range(0,len(X))
+    ]
+    return lasso_model_lis
+
+from sklearn.linear_model import Lasso
+# from sklearn.linear_model import Ridge
+def get_lasso(X,y,alpha=1,**kwargs):
+    """
+    suggested parameters:
+    alpha=1,max_iter=1000
+    """
+    lasso = Lasso(alpha = alpha,**kwargs)
+    lasso.fit(X, y)
+    return lasso
 
 def get_statsmodel_formula_string(target_name, features_list):
     formula = False
@@ -228,7 +358,9 @@ def regression_results(y_true, y_pred):
 
 # import ols from statsmodels.formula.api
 from statsmodels.formula.api import ols
-def statsmodel_ols_formula_regression(X,y,target_name=False,features_list=False,suppress=False,show_resid=False,qqplot_line='s'): #preferred over sm
+def statsmodel_ols_formula_regression(X,y,target_name=False,features_list=False,
+suppress=False,show_resid=False,qqplot_line='s',print_resid=False,
+resid_path=False): #preferred over sm
     """
     This model includes an intercept and seems to be better suited to
     a running an Ordinary LS than the 'statsmodels.api sm regression'
@@ -261,6 +393,11 @@ def statsmodel_ols_formula_regression(X,y,target_name=False,features_list=False,
     if show_resid:
         res = model.resid
         fig = sm.qqplot(res, line=qqplot_line)
+        if print_resid:
+            if resid_path:
+                plt.savefig(resid_path)
+            else:
+                print("missing path to save figure")
         plt.show()
     return model
 
@@ -268,7 +405,7 @@ def statsmodel_ols_formula_regression(X,y,target_name=False,features_list=False,
 
 
 from sklearn.linear_model import LinearRegression
-def sklearn_ols_regression(X,y,print_coefficients=True,print_resid=False,show_resid=False,qqplot_line='s'):
+def sklearn_ols_regression(X,y,print_coefficients=True,print_resid=False,plot_resid=False,qqplot_line='s'):
     """
     ols regression in sklearn
     print: coefficients (optional), regression metrics (optional), qqplot (optional)
@@ -285,15 +422,14 @@ def sklearn_ols_regression(X,y,print_coefficients=True,print_resid=False,show_re
         print('Coefficients: ', linrig.coef_)
         print('y-intercept: ', np.round(linrig.intercept_,3))
         print('\n')
-#         print('R^2: ', np.round(linrig.score(X,y), 3)) # this is the r squared value from sklearn
 
     if print_resid:
         regression_results(y, y_pred)
 #         print('MSE: ', mean_squared_error(y, y_pred, multioutput='raw_values'))
-    if show_resid:
+    if plot_resid:
         sk_res = pd.Series(data=[np.abs(y - y_pred)])
         #correct this later
-        print('QQPLOT OF RESID NOT WORKING. IS RESID INCORRECT OR WRONG ORDER?\n')
+        print('QQPLOT OF RESID NOT WORKING. RESID INCORRECT OR WRONG ORDER?\n')
         fig = sm.qqplot(sk_res,line=qqplot_line)
         plt.show()
     return linrig
