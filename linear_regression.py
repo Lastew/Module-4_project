@@ -186,9 +186,7 @@ def train_test_split_fxn(X, y, random_state = 12345, test_size = .25):
     test_size - proportion of df
     output: X_train, X_test, y_train, y_test
     """
-    X_train, X_test, y_train, y_test = 0,0,0,0
-    X_train, X_test, y_train, y_test = \
-    train_test_split(X, y, random_state = 42, test_size = test_size)
+    X_train, X_test, y_train, y_test = train_test_split(X, y, random_state = 42, test_size = test_size)
     return X_train, X_test, y_train, y_test
 
 import seaborn as sns
